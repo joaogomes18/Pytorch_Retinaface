@@ -3,7 +3,7 @@ import os
 import torch
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
-#import argparse
+import argparse
 import torch.utils.data as data
 from data import WiderFaceDetection, detection_collate, preproc, cfg_mnet, cfg_re50
 from layers.modules import MultiBoxLoss
@@ -13,37 +13,27 @@ import datetime
 import math
 from models.retinaface import RetinaFace
 
-#parser = argparse.ArgumentParser(description='Retinaface Training')
-#parser.add_argument('--training_dataset', default='./data/widerface/train/label.txt', help='Training dataset directory')
-#parser.add_argument('--network', default='mobile0.25', help='Backbone network mobile0.25 or resnet50')
-#parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
-#parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float, help='initial learning rate')
-#parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-#parser.add_argument('--resume_net', default=None, help='resume net for retraining')
-#parser.add_argument('--resume_epoch', default=0, type=int, help='resume iter for retraining')
-#parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight decay for SGD')
-#parser.add_argument('--gamma', default=0.1, type=float, help='Gamma update for SGD')
-#parser.add_argument('--save_folder', default='./weights/', help='Location to save checkpoint models')
+parser = argparse.ArgumentParser(description='Retinaface Training')
+parser.add_argument('--training_dataset', default='./data/widerface/train/label.txt', help='Training dataset directory')
+parser.add_argument('--network', default='mobile0.25', help='Backbone network mobile0.25 or resnet50')
+parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float, help='initial learning rate')
+parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
+parser.add_argument('--resume_net', default=None, help='resume net for retraining')
+parser.add_argument('--resume_epoch', default=0, type=int, help='resume iter for retraining')
+parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight decay for SGD')
+parser.add_argument('--gamma', default=0.1, type=float, help='Gamma update for SGD')
+parser.add_argument('--save_folder', default='./weights/', help='Location to save checkpoint models')
 
-#args = parser.parse_args()
+args = parser.parse_args()
 
-#if not os.path.exists(args.save_folder):
-#    os.mkdir(args.save_folder)
-#cfg = None
-#if args.network == "mobile0.25":
-#    cfg = cfg_mnet
-#elif args.network == "resnet50":
-#    cfg = cfg_re50
-    
-if not os.path.exists('./weights/'):
-    os.mkdir('./weights/')
+if not os.path.exists(args.save_folder):
+    os.mkdir(args.save_folder)
 cfg = None
-#if args.network == "mobile0.25":
-#    cfg = cfg_mnet
-#elif args.network == "resnet50":
-#    cfg = cfg_re50
-
-cfg = cfg_re50
+if args.network == "mobile0.25":
+    cfg = cfg_mnet
+elif args.network == "resnet50":
+    cfg = cfg_re50
 
 rgb_mean = (104, 117, 123) # bgr order
 num_classes = 2
@@ -53,31 +43,21 @@ batch_size = cfg['batch_size']
 max_epoch = cfg['epoch']
 gpu_train = cfg['gpu_train']
 
-#num_workers = args.num_workers
-#momentum = args.momentum
-#weight_decay = args.weight_decay
-#initial_lr = args.lr
-#gamma = args.gamma
-#training_dataset = args.training_dataset
-#save_folder = args.save_folder
-
-num_workers = 4
-momentum = 0.9
-weight_decay = 5e-4
-initial_lr = 1e-3
-gamma = 0.1
-training_dataset = './data/widerface/train/label.txt'
-save_folder = './weights/'
+num_workers = args.num_workers
+momentum = args.momentum
+weight_decay = args.weight_decay
+initial_lr = args.lr
+gamma = args.gamma
+training_dataset = args.training_dataset
+save_folder = args.save_folder
 
 net = RetinaFace(cfg=cfg)
 print("Printing net...")
 print(net)
 
-#if args.resume_net is not None:
-if None is not None:
+if args.resume_net is not None:
     print('Loading resume network...')
-    #state_dict = torch.load(args.resume_net)
-    state_dict = torch.load(None)
+    state_dict = torch.load(args.resume_net)
     # create new OrderedDict that does not contain `module.`
     from collections import OrderedDict
     new_state_dict = OrderedDict()
@@ -107,9 +87,10 @@ with torch.no_grad():
     priors = priors.cuda()
 
 def train():
+    filetime = time.time()
+    file = open("Loss "+ str(filetime)+".txt","w")
     net.train()
-    #epoch = 0 + args.resume_epoch
-    epoch = 0 + 0
+    epoch = 0 + args.resume_epoch
     print('Loading Dataset...')
 
     dataset = WiderFaceDetection( training_dataset,preproc(img_dim, rgb_mean))
@@ -120,10 +101,8 @@ def train():
     stepvalues = (cfg['decay1'] * epoch_size, cfg['decay2'] * epoch_size)
     step_index = 0
 
-    #if args.resume_epoch > 0:
-    #    start_iter = args.resume_epoch * epoch_size
-    if 0 > 0:
-        start_iter = 0 * epoch_size
+    if args.resume_epoch > 0:
+        start_iter = args.resume_epoch * epoch_size
     else:
         start_iter = 0
 
@@ -133,7 +112,10 @@ def train():
             batch_iterator = iter(data.DataLoader(dataset, batch_size, shuffle=True, num_workers=num_workers, collate_fn=detection_collate))
             if (epoch % 10 == 0 and epoch > 0) or (epoch % 5 == 0 and epoch > cfg['decay1']):
                 torch.save(net.state_dict(), save_folder + cfg['name']+ '_epoch_' + str(epoch) + '.pth')
+            if(epoch != 0):
+                f.write(str(loss_per_epoch/85)+"\n")
             epoch += 1
+            loss_per_epoch = 0
 
         load_t0 = time.time()
         if iteration in stepvalues:
@@ -153,6 +135,7 @@ def train():
         loss_l, loss_c, loss_landm = criterion(out, priors, targets)
         loss = cfg['loc_weight'] * loss_l + loss_c + loss_landm
         loss.backward()
+        loss_per_epoch += loss
         optimizer.step()
         load_t1 = time.time()
         batch_time = load_t1 - load_t0
@@ -162,6 +145,8 @@ def train():
               epoch_size, iteration + 1, max_iter, loss_l.item(), loss_c.item(), loss_landm.item(), lr, batch_time, str(datetime.timedelta(seconds=eta))))
 
     torch.save(net.state_dict(), save_folder + cfg['name'] + '_Final.pth')
+    f.write(str(loss_per_epoch/85)+"\n")
+    f.close()
     # torch.save(net.state_dict(), save_folder + 'Final_Retinaface.pth')
 
 
