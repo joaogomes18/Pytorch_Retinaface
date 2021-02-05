@@ -88,7 +88,7 @@ with torch.no_grad():
 
 def train():
     filetime = time.time()
-    f = open("Loss "+ str(filetime)+".txt","w")
+    f = open("Loss_"+args.network+"_"+str(max_epoch)+".txt","w")
     net.train()
     epoch = 0 + args.resume_epoch
     print('Loading Dataset...')
