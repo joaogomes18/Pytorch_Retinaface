@@ -113,7 +113,7 @@ def train():
             if (epoch % 10 == 0 and epoch > 0) or (epoch % 5 == 0 and epoch > cfg['decay1']):
                 torch.save(net.state_dict(), save_folder + cfg['name']+ '_epoch_' + str(epoch) + '.pth')
             if(epoch != 0):
-                f.write("{}\n".format(loss_per_epoch/805))
+                f.write("{}\n".format(loss_per_epoch/epoch_size))
             epoch += 1
             loss_per_epoch = 0
 
@@ -145,7 +145,7 @@ def train():
               epoch_size, iteration + 1, max_iter, loss_l.item(), loss_c.item(), loss_landm.item(), lr, batch_time, str(datetime.timedelta(seconds=eta))))
 
     torch.save(net.state_dict(), save_folder + cfg['name'] + '_Final.pth')
-    f.write("{}\n".format(loss_per_epoch/805))
+    f.write("{}\n".format(loss_per_epoch/epoch_size))
     f.close()
     # torch.save(net.state_dict(), save_folder + 'Final_Retinaface.pth')
 
